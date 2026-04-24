@@ -9,9 +9,11 @@
 
 const admin = require('firebase-admin');
 
+const serviceAccount = require('./service-account-seed.json');
+
 admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
-  projectId: process.env.FIREBASE_PROJECT_ID || 'your-project-id',
+  credential: admin.credential.cert(serviceAccount),
+  projectId: process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id,
 });
 
 const db = admin.firestore();

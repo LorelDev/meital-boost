@@ -15,7 +15,7 @@ type EnrichedUserTask = UserTask & {
 const statusLabels: Record<string, string> = {
   pending: 'ממתין',
   in_progress: 'בתהליך',
-  completed: 'הושלם - ממתין לאישור',
+  completed: 'הושלם (מטבעות הוענקו)',
   approved: 'אושר ✓',
 };
 
@@ -107,7 +107,7 @@ export default function ActivityPage() {
         <div className="flex gap-2 mb-6">
           {[
             { key: 'all', label: 'הכל' },
-            { key: 'completed', label: 'ממתין לאישור' },
+            { key: 'completed', label: 'הושלמו' },
             { key: 'in_progress', label: 'בתהליך' },
             { key: 'approved', label: 'אושרו' },
           ].map((f) => (
@@ -194,7 +194,7 @@ export default function ActivityPage() {
                           {approving === item.id ? (
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           ) : (
-                            'אשר ← הענק מטבעות'
+                            'סמן כאושר ✓'
                           )}
                         </button>
                       )}

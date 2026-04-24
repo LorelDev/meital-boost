@@ -1,14 +1,9 @@
 import {
   collection,
-  doc,
-  addDoc,
-  updateDoc,
-  increment,
   query,
   where,
   orderBy,
   getDocs,
-  serverTimestamp,
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
@@ -17,26 +12,13 @@ import { db } from './firebase';
 export interface CoinTransaction {
   id: string;
   userId: string;
+  taskId?: string;
+  userTaskId?: string;
   amount: number;
   reason: string;
+  type?: 'task_completion' | 'manual';
   createdAt: any;
 }
-
-export const awardCoins = async (
-  userId: string,
-  amount: number,
-  reason: string
-) => {
-  await addDoc(collection(db, 'coins_history'), {
-    userId,
-    amount,
-    reason,
-    createdAt: serverTimestamp(),
-  });
-  await updateDoc(doc(db, 'users', userId), {
-    coins: increment(amount),
-  });
-};
 
 export const getCoinHistory = async (userId: string): Promise<CoinTransaction[]> => {
   const q = query(

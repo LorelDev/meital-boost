@@ -70,7 +70,7 @@ export default function TasksScreen() {
           try {
             await completeTask(userTaskId);
             await load();
-            Alert.alert('', 'משימה הושלמה! ממתין לאישור 🎉');
+            Alert.alert('', 'כל הכבוד! המטבעות הוענקו לחשבונך 🎉');
           } catch {
             Alert.alert('שגיאה', 'לא ניתן לסיים את המשימה');
           }
