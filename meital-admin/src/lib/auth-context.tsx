@@ -16,6 +16,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+async function getDocWithRetry(ref: ReturnType<typeof doc>, retries = 3): Promise<ReturnType<typeof getDoc>> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await getDoc(ref);
+    } catch (e: any) {
+      if (i < retries - 1 && (e?.message?.includes('offline') || e?.code === 'unavailable')) {
+        await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  return getDoc(ref);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -25,9 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
-        const snap = await getDoc(doc(db, 'users', u.uid));
-        if (snap.exists()) {
-          setProfile({ id: snap.id, ...snap.data() } as UserProfile);
+        try {
+          const snap = await getDocWithRetry(doc(db, 'users', u.uid));
+          if (snap.exists()) {
+            setProfile({ id: snap.id, ...snap.data() } as UserProfile);
+          }
+        } catch {
+          // Firestore unavailable — user still logged in, profile just empty
         }
       } else {
         setProfile(null);
@@ -43,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const cred = await signInWithEmailAndPassword(auth, email, password);
-    const snap = await getDoc(doc(db, 'users', cred.user.uid));
+    const snap = await getDocWithRetry(doc(db, 'users', cred.user.uid));
     if (!snap.exists() || snap.data()?.role !== 'admin') {
       await signOut(auth);
       throw new Error('אין לך הרשאות גישה לפאנל הניהול');
