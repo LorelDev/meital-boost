@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 
 export const isFirebaseConfigured =
   !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
@@ -19,5 +19,14 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Use experimentalForceLongPolling to avoid gRPC connection issues in some environments
+let db: ReturnType<typeof getFirestore>;
+try {
+  db = initializeFirestore(app, { experimentalForceLongPolling: true });
+} catch {
+  db = getFirestore(app);
+}
+
+export { db };
 export default app;
