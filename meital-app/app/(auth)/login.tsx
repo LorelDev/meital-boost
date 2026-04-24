@@ -14,14 +14,36 @@ import {
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { loginWithEmail } from '../../src/services/auth';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { loginWithEmail, loginWithGoogle } from '../../src/services/auth';
 import { colors, spacing, radius, typography, shadows } from '../../src/theme';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+
+  const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+  });
+
+  React.useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { id_token } = googleResponse.params;
+      setGoogleLoading(true);
+      loginWithGoogle(id_token)
+        .then(() => router.replace('/(tabs)/home'))
+        .catch((e) => Alert.alert('שגיאה', e.message))
+        .finally(() => setGoogleLoading(false));
+    }
+  }, [googleResponse]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -124,6 +146,28 @@ export default function LoginScreen() {
                   <Text style={styles.btnText}>התחבר</Text>
                 )}
               </LinearGradient>
+            </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>או</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.googleBtn, googleLoading && styles.btnDisabled]}
+              onPress={() => promptGoogleAsync()}
+              disabled={googleLoading || loading}
+              activeOpacity={0.85}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color={colors.textSecondary} />
+              ) : (
+                <>
+                  <Text style={styles.googleIcon}>G</Text>
+                  <Text style={styles.googleBtnText}>המשך עם Google</Text>
+                </>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -229,4 +273,30 @@ const styles = StyleSheet.create({
   registerLink: { marginTop: spacing.lg, alignItems: 'center' },
   registerText: { ...typography.body, color: colors.textSecondary },
   registerTextBold: { color: colors.primary, fontWeight: '700' },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { ...typography.caption, color: colors.textMuted },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  googleIcon: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4285F4',
+  },
+  googleBtnText: { ...typography.h4, color: colors.text },
 });

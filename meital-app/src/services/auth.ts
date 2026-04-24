@@ -3,6 +3,8 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithCredential,
   User,
 } from 'firebase/auth';
 import {
@@ -49,6 +51,29 @@ export const registerWithEmail = async (
     role: 'trainee',
     createdAt: serverTimestamp(),
   });
+
+  return user;
+};
+
+export const loginWithGoogle = async (idToken: string) => {
+  const credential = GoogleAuthProvider.credential(idToken);
+  const cred = await signInWithCredential(auth, credential);
+  const user = cred.user;
+
+  // Create profile if first time
+  const snap = await getDoc(doc(db, 'users', user.uid));
+  if (!snap.exists()) {
+    await setDoc(doc(db, 'users', user.uid), {
+      id: user.uid,
+      name: user.displayName || 'משתמש',
+      email: user.email || '',
+      phone: '',
+      coins: 0,
+      role: 'trainee',
+      avatarUrl: user.photoURL || '',
+      createdAt: serverTimestamp(),
+    });
+  }
 
   return user;
 };
