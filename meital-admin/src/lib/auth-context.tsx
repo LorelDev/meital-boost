@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db, isFirebaseConfigured } from './firebase';
 import { UserProfile } from './firestore';
 
 interface AuthContextType {
@@ -38,6 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
+    if (!isFirebaseConfigured) {
+      throw new Error('חסרה הגדרת Firebase. מלא את הקובץ .env.local לפי .env.local.example');
+    }
+
     const cred = await signInWithEmailAndPassword(auth, email, password);
     const snap = await getDoc(doc(db, 'users', cred.user.uid));
     if (!snap.exists() || snap.data()?.role !== 'admin') {

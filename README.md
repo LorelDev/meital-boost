@@ -152,7 +152,9 @@ firebase deploy --only hosting
   phone: string,
   coins: number,
   role: 'trainee' | 'admin',
-  createdAt: Timestamp
+  createdAt: Timestamp,
+  updatedAt?: Timestamp,
+  lastRewardedUserTaskId?: string
 }
 ```
 
@@ -174,8 +176,11 @@ firebase deploy --only hosting
 {
   userId: string,
   taskId: string,
+  reward: number,
   status: 'in_progress' | 'completed' | 'approved',
   completedAt?: Timestamp,
+  rewardAwarded: boolean,
+  rewardedAt?: Timestamp,
   createdAt: Timestamp
 }
 ```
@@ -184,8 +189,11 @@ firebase deploy --only hosting
 ```
 {
   userId: string,
+  taskId?: string,
+  userTaskId?: string,
   amount: number,
   reason: string,
+  type: 'task_completion' | 'manual',
   createdAt: Timestamp
 }
 ```
@@ -200,7 +208,7 @@ firebase deploy --only hosting
 | `/users` | רשימת משתמשים + הענקת מטבעות ידנית |
 | `/tasks` | יצירה/עריכה/מחיקה של משימות |
 | `/coins` | היסטוריה + הענקה ידנית |
-| `/activity` | אישור משימות שהושלמו → הענקת מטבעות אוטומטית |
+| `/activity` | אישור משימות שהושלמו; מטבעות ניתנים אוטומטית בסיום המשימה ללא כפילות |
 
 ---
 

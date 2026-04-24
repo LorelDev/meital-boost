@@ -17,11 +17,66 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isValidSelfProfileUpdate(userId) {
+      return isOwner(userId) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['name', 'phone', 'avatarUrl']) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.coins == resource.data.coins;
+    }
+
+    function isValidTaskRewardBalanceUpdate(userId) {
+      let userTaskId = request.resource.data.lastRewardedUserTaskId;
+      let userTaskAfter = getAfter(/databases/$(database)/documents/user_tasks/$(userTaskId)).data;
+      return isOwner(userId) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['coins', 'lastRewardedUserTaskId', 'updatedAt']) &&
+        userTaskId is string &&
+        userTaskAfter.userId == userId &&
+        userTaskAfter.status == 'completed' &&
+        userTaskAfter.rewardAwarded == true &&
+        userTaskAfter.reward is number &&
+        request.resource.data.coins == resource.data.coins + userTaskAfter.reward;
+    }
+
+    function isValidTaskCompletionUpdate() {
+      return isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        resource.data.status == 'in_progress' &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.taskId == resource.data.taskId &&
+        request.resource.data.reward == resource.data.reward &&
+        request.resource.data.status == 'completed' &&
+        request.resource.data.rewardAwarded == true &&
+        request.resource.data.diff(resource.data).changedKeys()
+          .hasOnly(['status', 'completedAt', 'rewardAwarded', 'rewardedAt']);
+    }
+
+    function isValidTaskCompletionCoinCreate(docId) {
+      return isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.type == 'task_completion' &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount > 0 &&
+        request.resource.data.taskId is string &&
+        request.resource.data.userTaskId is string &&
+        docId == request.resource.data.userTaskId &&
+        request.resource.data.reason is string &&
+        request.resource.data.amount ==
+          get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.reward &&
+        getAfter(/databases/$(database)/documents/user_tasks/$(request.resource.data.userTaskId)).data.userId == request.auth.uid &&
+        getAfter(/databases/$(database)/documents/user_tasks/$(request.resource.data.userTaskId)).data.taskId == request.resource.data.taskId &&
+        getAfter(/databases/$(database)/documents/user_tasks/$(request.resource.data.userTaskId)).data.rewardAwarded == true;
+    }
+
     // Users collection
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) &&
+        request.resource.data.role == 'trainee' &&
+        request.resource.data.coins == 0 &&
+        request.resource.data.email is string &&
+        request.resource.data.name is string;
+      allow update: if isValidSelfProfileUpdate(userId) || isValidTaskRewardBalanceUpdate(userId) || isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -36,9 +91,12 @@ service cloud.firestore {
       allow read: if isAuthenticated() &&
         (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() &&
-        (resource.data.userId == request.auth.uid || isAdmin());
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.reward is number &&
+        request.resource.data.reward == get(/databases/$(database)/documents/tasks/$(request.resource.data.taskId)).data.reward &&
+        request.resource.data.status == 'in_progress' &&
+        request.resource.data.rewardAwarded == false;
+      allow update: if isValidTaskCompletionUpdate() || isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -46,7 +104,7 @@ service cloud.firestore {
     match /coins_history/{docId} {
       allow read: if isAuthenticated() &&
         (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAdmin();
+      allow create: if isValidTaskCompletionCoinCreate(docId) || isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

@@ -21,6 +21,8 @@ export interface UserProfile {
   coins: number;
   role: 'trainee' | 'admin';
   createdAt: any;
+  updatedAt?: any;
+  lastRewardedUserTaskId?: string;
   avatarUrl?: string;
 }
 

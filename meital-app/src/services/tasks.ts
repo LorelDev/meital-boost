@@ -3,12 +3,12 @@ import {
   doc,
   getDocs,
   getDoc,
-  addDoc,
-  updateDoc,
+  runTransaction,
+  increment,
   query,
   where,
   orderBy,
-  serverTimestamp,
+  Timestamp,
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
@@ -29,8 +29,11 @@ export interface UserTask {
   id: string;
   userId: string;
   taskId: string;
+  reward?: number;
   status: 'pending' | 'in_progress' | 'completed' | 'approved';
   completedAt?: any;
+  rewardAwarded?: boolean;
+  rewardedAt?: any;
   task?: Task;
 }
 
@@ -66,18 +69,75 @@ export const getUserTasks = async (userId: string): Promise<UserTask[]> => {
 };
 
 export const startTask = async (userId: string, taskId: string) => {
-  return addDoc(collection(db, 'user_tasks'), {
-    userId,
-    taskId,
-    status: 'in_progress',
-    createdAt: serverTimestamp(),
+  return runTransaction(db, async (transaction) => {
+    const taskSnap = await transaction.get(doc(db, 'tasks', taskId));
+    if (!taskSnap.exists()) {
+      throw new Error('Task was not found');
+    }
+
+    const task = taskSnap.data() as Task;
+    if (!task.active) {
+      throw new Error('Task is not active');
+    }
+
+    const userTaskRef = doc(collection(db, 'user_tasks'));
+    transaction.set(userTaskRef, {
+      userId,
+      taskId,
+      reward: task.reward,
+      status: 'in_progress',
+      rewardAwarded: false,
+      createdAt: Timestamp.now(),
+    });
+    return userTaskRef;
   });
 };
 
 export const completeTask = async (userTaskId: string) => {
-  return updateDoc(doc(db, 'user_tasks', userTaskId), {
-    status: 'completed',
-    completedAt: serverTimestamp(),
+  return runTransaction(db, async (transaction) => {
+    const userTaskRef = doc(db, 'user_tasks', userTaskId);
+    const userTaskSnap = await transaction.get(userTaskRef);
+
+    if (!userTaskSnap.exists()) {
+      throw new Error('User task was not found');
+    }
+
+    const userTask = userTaskSnap.data() as UserTask;
+    if (userTask.rewardAwarded || userTask.status === 'completed' || userTask.status === 'approved') {
+      return;
+    }
+
+    const taskRef = doc(db, 'tasks', userTask.taskId);
+    const taskSnap = await transaction.get(taskRef);
+    if (!taskSnap.exists()) {
+      throw new Error('Task was not found');
+    }
+
+    const task = { id: taskSnap.id, ...taskSnap.data() } as Task;
+    const now = Timestamp.now();
+
+    transaction.update(userTaskRef, {
+      status: 'completed',
+      completedAt: now,
+      rewardAwarded: true,
+      rewardedAt: now,
+    });
+
+    transaction.update(doc(db, 'users', userTask.userId), {
+      coins: increment(task.reward),
+      lastRewardedUserTaskId: userTaskId,
+      updatedAt: now,
+    });
+
+    transaction.set(doc(db, 'coins_history', userTaskId), {
+      userId: userTask.userId,
+      taskId: task.id,
+      userTaskId,
+      amount: task.reward,
+      reason: `השלמת משימה: ${task.title}`,
+      type: 'task_completion',
+      createdAt: now,
+    });
   });
 };
 

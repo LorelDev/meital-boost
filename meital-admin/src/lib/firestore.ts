@@ -6,13 +6,12 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  runTransaction,
   query,
   where,
   orderBy,
   serverTimestamp,
   increment,
-  onSnapshot,
-  Unsubscribe,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -25,6 +24,8 @@ export interface UserProfile {
   coins: number;
   role: 'trainee' | 'admin';
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
+  lastRewardedUserTaskId?: string;
 }
 
 export interface Task {
@@ -41,16 +42,23 @@ export interface UserTask {
   id: string;
   userId: string;
   taskId: string;
+  reward?: number;
   status: 'pending' | 'in_progress' | 'completed' | 'approved';
   completedAt?: Timestamp;
+  approvedAt?: Timestamp;
+  rewardAwarded?: boolean;
+  rewardedAt?: Timestamp;
   createdAt: Timestamp;
 }
 
 export interface CoinTransaction {
   id: string;
   userId: string;
+  taskId?: string;
+  userTaskId?: string;
   amount: number;
   reason: string;
+  type?: 'task_completion' | 'manual';
   createdAt: Timestamp;
 }
 
@@ -90,18 +98,40 @@ export const getAllUserTasks = async (): Promise<UserTask[]> => {
 };
 
 export const approveUserTask = async (userTaskId: string, userId: string, taskReward: number, taskTitle: string) => {
-  await updateDoc(doc(db, 'user_tasks', userTaskId), {
-    status: 'approved',
-    approvedAt: serverTimestamp(),
-  });
-  await addDoc(collection(db, 'coins_history'), {
-    userId,
-    amount: taskReward,
-    reason: `השלמת משימה: ${taskTitle}`,
-    createdAt: serverTimestamp(),
-  });
-  await updateDoc(doc(db, 'users', userId), {
-    coins: increment(taskReward),
+  await runTransaction(db, async (transaction) => {
+    const userTaskRef = doc(db, 'user_tasks', userTaskId);
+    const userTaskSnap = await transaction.get(userTaskRef);
+
+    if (!userTaskSnap.exists()) {
+      throw new Error('User task was not found');
+    }
+
+    const userTask = userTaskSnap.data() as UserTask;
+    const alreadyAwarded = userTask.rewardAwarded === true;
+
+    transaction.update(userTaskRef, {
+      status: 'approved',
+      approvedAt: serverTimestamp(),
+      rewardAwarded: true,
+      rewardedAt: userTask.rewardedAt ?? serverTimestamp(),
+    });
+
+    if (!alreadyAwarded) {
+      transaction.set(doc(db, 'coins_history', userTaskId), {
+        userId,
+        taskId: userTask.taskId,
+        userTaskId,
+        amount: taskReward,
+        reason: `השלמת משימה: ${taskTitle}`,
+        type: 'task_completion',
+        createdAt: serverTimestamp(),
+      });
+      transaction.update(doc(db, 'users', userId), {
+        coins: increment(taskReward),
+        lastRewardedUserTaskId: userTaskId,
+        updatedAt: serverTimestamp(),
+      });
+    }
   });
 };
 
@@ -111,6 +141,7 @@ export const awardCoinsManually = async (userId: string, amount: number, reason:
     userId,
     amount,
     reason,
+    type: 'manual',
     createdAt: serverTimestamp(),
   });
   await updateDoc(doc(db, 'users', userId), {
