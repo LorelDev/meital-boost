@@ -6,10 +6,6 @@ on:
     paths:
       - 'meital-admin/**'
       - '.github/workflows/deploy-admin.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'meital-admin/**'
 
 env:
   VERCEL_ORG_ID: team_8ZRHtoTMyHw678O0LMlWFNAu
@@ -28,16 +24,23 @@ jobs:
           cache: 'npm'
           cache-dependency-path: meital-admin/package-lock.json
 
+      - name: Install dependencies
+        run: npm install
+        working-directory: meital-admin
+
+      - name: Build
+        run: npm run build
+        working-directory: meital-admin
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
-
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: meital-admin
-
-      - name: Build project
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: meital-admin
 
       - name: Deploy to Vercel
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
