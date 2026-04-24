@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, DocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { UserProfile } from './firestore';
 
@@ -16,7 +16,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-async function getDocWithRetry(ref: ReturnType<typeof doc>, retries = 3): Promise<ReturnType<typeof getDoc>> {
+async function getDocWithRetry(ref: ReturnType<typeof doc>, retries = 3): Promise<DocumentSnapshot<DocumentData>> {
   for (let i = 0; i < retries; i++) {
     try {
       return await getDoc(ref);
